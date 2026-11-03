@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CS2 Mobile - de_dust2 Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0f172a;
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+        }
+        .font-cs {
+            font-family: 'Teko', sans-serif;
+            letter-spacing: 0.5px;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .cs2-glass {
+            background: linear-gradient(135deg, rgba(20, 27, 45, 0.82) 0%, rgba(10, 15, 26, 0.92) 100%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+        }
+        .cs2-hud-card {
+            background: rgba(13, 17, 23, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        #joystick-base {
+            position: absolute;
+            width: 124px;
+            height: 124px;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(15,23,42,0.65) 100%);
+            border: 2px solid rgba(245, 158, 11, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+            z-index: 30;
+            box-shadow: 0 0 24px rgba(245, 158, 11, 0.25);
+        }
+        #joystick-knob {
+            position: absolute;
+            top: 37px;
+            left: 37px;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, #fbbf24 0%, #b45309 100%);
+            border: 2px solid #fef3c7;
+            border-radius: 50%;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.8);
+            pointer-events: none;
+        }
+        #damage-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 45%, rgba(239, 68, 68, 0.7) 100%);
+            opacity: 0;
+            transition: opacity 0.12s ease-out;
+            z-index: 12;
+        }
+        #scope-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 16;
+            display: none;
+            background: radial-gradient(circle, transparent 32%, rgba(0,0,0,0.96) 35%, #000 100%);
+        }
+        .floating-dmg {
+            position: absolute;
+            font-weight: 800;
+            font-size: 19px;
+            pointer-events: none;
+            z-index: 35;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.95);
+            animation: dmgAnim 0.75s ease-out forwards;
+        }
+        @keyframes dmgAnim {
+            0% { transform: translate(-50%, 0) scale(0.8); opacity: 1; }
+            25% { transform: translate(-50%, -16px) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -46px) scale(0.9); opacity: 0; }
+        }
+        .ch-line {
+            box-shadow: 0 0 2px #000, 0 0 4px rgba(0,0,0,0.8);
+            transition: all 0.15s ease;
+        }
+        .setting-tab.active {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+            color: #fbbf24;
+        }
+        @media screen and (orientation: portrait) {
+            #portrait-warning:not(.dismissed) {
+                display: flex !important;
+            }
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none bg-slate-950">
+
+    <!-- Portrait Warning modal with force bypass -->
+    <div id="portrait-warning" class="absolute inset-0 bg-slate-950/95 z-[100] hidden flex-col items-center justify-center p-6 text-center backdrop-blur-md">
+        <div class="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center mb-4 animate-pulse">
+            <svg class="w-9 h-9 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 17h16M7 4v16M17 4v16"/>
+            </svg>
+        </div>
+        <h2 class="text-3xl font-bold font-cs text-amber-400 tracking-wider">ПОВЕРНИТЕ ЭКРАН ГОРИЗОНТАЛЬНО</h2>
+        <p class="text-slate-300 mt-1 max-w-xs text-sm">Для полного погружения в de_dust2 (CS2) на мобильных устройствах переверните устройство в альбомный режим.</p>
+        <button id="btn-dismiss-portrait" class="mt-5 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-lg active:scale-95 transition">
+            ПРОДОЛЖИТЬ В ЭТОМ РЕЖИМЕ
+        </button>
+    </div>
+
+    <!-- Main WebGL 3D Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Damage Red Vignette -->
+    <div id="damage-overlay"></div>
+
+    <!-- AWP Sniper Scope Overlay -->
+    <div id="scope-overlay">
+        <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-full h-[1.5px] bg-black/90"></div>
+            <div class="h-full w-[1.5px] bg-black/90 absolute"></div>
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-red-500 bg-red-500/40"></div>
+            <div class="w-56 h-56 rounded-full border border-red-500/35 absolute"></div>
+            <div class="w-96 h-96 rounded-full border border-white/10 absolute"></div>
+        </div>
+    </div>
+
+    <!-- CS2 Dynamic Customizable Crosshair & Hitmarker -->
+    <div id="crosshair-wrapper" class="absolute inset-0 flex items-center justify-center pointer-events-none z-14">
+        <div id="crosshair-container" class="relative flex items-center justify-center">
+            <!-- Dynamic Crosshair Lines / Dot -->
+            <div id="ch-top" class="ch-line absolute"></div>
+            <div id="ch-bottom" class="ch-line absolute"></div>
+            <div id="ch-left" class="ch-line absolute"></div>
+            <div id="ch-right" class="ch-line absolute"></div>
+            <div id="ch-dot" class="absolute rounded-full shadow-[0_0_3px_#000]"></div>
+            <div id="ch-circle" class="absolute rounded-full border border-emerald-400 hidden"></div>
+
+            <svg id="hitmarker" class="w-8 h-8 text-red-500 opacity-0 transition-opacity duration-75 absolute drop-shadow-[0_0_6px_rgba(239,68,68,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+                <path stroke-linecap="round" d="M4 4l5 5m11-5l-5 5M4 20l5-5m11 5l-5-5"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Floating Damage Numbers Container -->
+    <div id="damage-numbers" class="absolute inset-0 pointer-events-none overflow-hidden z-25"></div>
+
+    <!-- Top Left: CS2 Radar Minimap -->
+    <div class="absolute top-2 left-2 sm:top-3 sm:left-4 cs2-glass rounded-2xl p-1 pointer-events-none z-20 shadow-xl border border-white/15">
+        <div class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-slate-950/80">
+            <canvas id="radarCanvas" width="128" height="128" class="w-full h-full"></canvas>
+            <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-400 tracking-wider">DE_DUST2</div>
+            <div class="absolute bottom-1 right-2 text-[9px] font-bold text-sky-400 tracking-wider" id="player-loc-name">LONG A</div>
+        </div>
+    </div>
+
+    <!-- Top Center: CS2 Modern Scoreboard (Avatars / Player Count + Round Timer) -->
+    <div class="absolute top-2 left-1/2 -translate-x-1/2 flex items-center space-x-2 pointer-events-none z-20">
+        <!-- CT Team Cards -->
+        <div class="cs2-glass px-3 py-1.5 rounded-xl flex items-center space-x-2 border-l-4 border-sky-400">
+            <div class="flex items-center space-x-1" id="ct-avatars">
+                <div class="w-2.5 h-4 bg-sky-400 rounded-sm"></div>
+                <div class="w-2.5 h-4 bg-sky-400 rounded-sm"></div>
+                <div class="w-2.5 h-4 bg-sky-400 rounded-sm"></div>
+                <div class="w-2.5 h-4 bg-sky-400 rounded-sm"></div>
+                <div class="w-2.5 h-4 bg-sky-400 rounded-sm"></div>
+            </div>
+            <span id="score-ct" class="font-cs text-2xl font-bold text-sky-300 leading-none">0</span>
+        </div>
+
+        <!-- Center Round Timer -->
+        <div class="cs2-glass px-4 py-1.5 rounded-xl text-center border-t border-white/20">
+            <div id="round-timer" class="font-cs text-2xl font-bold text-amber-300 leading-none">1:55</div>
+        </div>
+
+        <!-- T Team Cards -->
+        <div class="cs2-glass px-3 py-1.5 rounded-xl flex items-center space-x-2 border-r-4 border-amber-500">
+            <span id="score-t" class="font-cs text-2xl font-bold text-amber-400 leading-none">0</span>
+            <div class="flex items-center space-x-1" id="t-avatars">
+                <div class="w-2.5 h-4 bg-amber-500 rounded-sm" id="t-av-0"></div>
+                <div class="w-2.5 h-4 bg-amber-500 rounded-sm" id="t-av-1"></div>
+                <div class="w-2.5 h-4 bg-amber-500 rounded-sm" id="t-av-2"></div>
+                <div class="w-2.5 h-4 bg-amber-500 rounded-sm" id="t-av-3"></div>
+                <div class="w-2.5 h-4 bg-amber-500 rounded-sm" id="t-av-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Right: CS2 Killfeed & Action Toggles -->
+    <div class="absolute top-2 right-2 sm:top-3 sm:right-4 flex flex-col items-end space-y-2 z-20">
+        <!-- Quick Settings, Buy & Auto-Fire toggles -->
+        <div class="flex items-center space-x-1.5 pointer-events-auto">
+            <button id="btn-settings" class="cs2-glass p-1.5 rounded-xl text-slate-300 hover:text-white border border-white/20 active:scale-95 transition" title="Настройки">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="btn-autofire" class="cs2-glass px-2.5 py-1 rounded-xl text-xs font-bold flex items-center space-x-1.5 border border-emerald-500/40 active:scale-95 transition">
+                <span id="autofire-dot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"></span>
+                <span class="text-slate-200 text-[11px]">АВТО: <span id="autofire-state" class="text-emerald-400">ВКЛ</span></span>
+            </button>
+            <button id="btn-buy" class="cs2-glass px-2.5 py-1 rounded-xl text-xs font-bold text-amber-300 flex items-center space-x-1 border border-amber-400/50 bg-amber-500/10 active:scale-95 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span class="text-[11px]">МАГАЗ ($<span id="player-money-top">1600</span>)</span>
+            </button>
+        </div>
+
+        <!-- Animated Killfeed stack -->
+        <div id="kill-feed" class="flex flex-col items-end space-y-1.5 pointer-events-none"></div>
+    </div>
+
+    <!-- Round Event Banner -->
+    <div id="round-banner" class="absolute top-24 left-1/2 -translate-x-1/2 cs2-glass px-8 py-2.5 rounded-2xl border border-amber-400/60 text-center pointer-events-none z-30 opacity-0 transition-opacity duration-300 shadow-2xl">
+        <div id="round-banner-text" class="font-cs text-3xl font-bold text-amber-300 tracking-wider">СПЕЦНАЗ ПОБЕДИЛ!</div>
+    </div>
+
+    <!-- Bottom Left: CS2 Health, Armor & Money meters -->
+    <div class="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 flex items-center space-x-2.5 pointer-events-none z-20">
+        <div class="cs2-glass px-3.5 py-1.5 rounded-2xl flex items-center space-x-3.5 border border-white/10">
+            <!-- HP with mini progress bar -->
+            <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5 text-red-500 drop-shadow-[0_0_6px_rgba(239,68,68,0.6)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                <div class="flex flex-col">
+                    <span id="player-hp" class="font-cs text-3xl font-bold text-red-400 leading-none">100</span>
+                    <div class="w-14 h-1.5 bg-slate-800 rounded-full mt-0.5 overflow-hidden">
+                        <div id="hp-bar" class="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-150" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-7 w-[1px] bg-white/15"></div>
+
+            <!-- Armor with mini progress bar -->
+            <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5 text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.6)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+                <div class="flex flex-col">
+                    <span id="player-armor" class="font-cs text-3xl font-bold text-sky-300 leading-none">100</span>
+                    <div class="w-14 h-1.5 bg-slate-800 rounded-full mt-0.5 overflow-hidden">
+                        <div id="armor-bar" class="h-full bg-gradient-to-r from-sky-600 to-sky-400 transition-all duration-150" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cash badge -->
+        <div class="cs2-glass px-3.5 py-1.5 rounded-2xl flex items-center space-x-1 border border-emerald-500/30">
+            <span class="text-emerald-400 font-bold text-lg">$</span>
+            <span id="player-money" class="font-cs text-3xl font-bold text-emerald-300 leading-none">1600</span>
+        </div>
+    </div>
+
+    <!-- Bottom Center: CS2 Quick Weapon Switcher Bar -->
+    <div class="absolute bottom-3 left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5 z-20 pointer-events-auto">
+        <button onclick="switchWeaponSlot('knife')" id="slot-knife" class="cs2-hud-card px-3 py-1 rounded-xl text-xs font-bold hover:border-amber-400 transition">
+            [1] НОЖ
+        </button>
+        <button onclick="switchWeaponSlot('pistol')" id="slot-pistol" class="cs2-hud-card px-3 py-1 rounded-xl text-xs font-bold border-amber-400 text-amber-300 transition">
+            [2] ПИСТОЛЕТ
+        </button>
+        <button onclick="switchWeaponSlot('primary')" id="slot-primary" class="cs2-hud-card px-3 py-1 rounded-xl text-xs font-bold hover:border-amber-400 transition">
+            [3] ВИНТОВКА
+        </button>
+    </div>
+
+    <!-- Bottom Right: Weapon Silhouette & Ammo Count -->
+    <div class="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 pointer-events-none z-20 text-right">
+        <div class="cs2-glass px-4 py-1.5 rounded-2xl inline-block border-r-4 border-amber-400 shadow-xl">
+            <div class="text-[11px] text-amber-300 font-bold uppercase tracking-widest" id="weapon-name">USP-S TACTICAL</div>
+            <div class="flex items-baseline space-x-1 justify-end leading-none">
+                <span id="ammo-cur" class="font-cs text-4xl font-bold text-white">12</span>
+                <span class="text-slate-500 font-cs text-2xl">/</span>
+                <span id="ammo-max" class="font-cs text-2xl text-slate-400">60</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Touch Interaction Layers -->
+    <div id="touch-layer" class="absolute inset-0 z-15">
+        <!-- Left Side: Movement Virtual Joystick Zone -->
+        <div id="zone-move" class="absolute top-14 left-0 w-1/2 bottom-0"></div>
+        <!-- Right Side: Camera Look & Swipe Zone -->
+        <div id="zone-look" class="absolute top-14 right-0 w-1/2 bottom-0"></div>
+
+        <!-- Left Secondary Fire Button (Claw Grip) -->
+        <button id="btn-fire-left" class="absolute top-44 left-4 w-14 h-14 cs2-glass border-2 border-amber-400/60 rounded-2xl flex items-center justify-center text-amber-300 active:scale-90 transition-transform z-25 shadow-lg">
+            <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+
+        <!-- Right Action Cluster -->
+        <div class="absolute bottom-16 right-3 sm:right-6 flex items-end space-x-3 z-25 pointer-events-auto">
+            <!-- Utility Actions (Jump, Reload, Switch) -->
+            <div class="flex flex-col space-y-2">
+                <button id="btn-swap-mobile" class="w-12 h-12 cs2-glass rounded-2xl flex flex-col items-center justify-center text-slate-200 active:scale-90">
+                    <svg class="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    <span class="text-[8px] font-bold">СМЕНА</span>
+                </button>
+                <button id="btn-jump" class="w-12 h-12 cs2-glass rounded-2xl flex flex-col items-center justify-center text-slate-200 active:scale-90">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                    <span class="text-[8px] font-bold">ПРЫЖОК</span>
+                </button>
+                <button id="btn-reload" class="w-12 h-12 cs2-glass rounded-2xl flex flex-col items-center justify-center text-amber-300 active:scale-90">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.58m15.36 2A8 8 0 004.58 9m0 0H9m11 11v-5h-.58m0 0a8 8 0 01-15.36-2m15.36 2H15"/></svg>
+                    <span class="text-[8px] font-bold">RELOAD</span>
+                </button>
+            </div>
+
+            <!-- Primary Fire & Scope Column -->
+            <div class="flex flex-col items-center space-y-2">
+                <button id="btn-scope" class="w-13 h-13 cs2-glass border border-sky-400/60 rounded-2xl flex flex-col items-center justify-center text-sky-300 active:scale-90 shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+                    <span class="text-[8px] font-bold">ПРИЦЕЛ</span>
+                </button>
+                <button id="btn-fire" class="w-20 h-20 bg-gradient-to-br from-amber-500 to-red-600 border-2 border-amber-200 rounded-full flex flex-col items-center justify-center text-white shadow-[0_0_28px_rgba(245,158,11,0.6)] active:scale-90 transition-transform">
+                    <svg class="w-9 h-9" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 15a5 5 0 115-5 5 5 0 01-5 5z"/></svg>
+                    <span class="text-[9px] font-extrabold tracking-wider">ОГОНЬ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Virtual Joystick Visual Indicator -->
+    <div id="joystick-base">
+        <div id="joystick-knob"></div>
+    </div>
+
+    <!-- SETTINGS MODAL: Graphics & Crosshair Customizer -->
+    <div id="settings-modal" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-3">
+        <div class="cs2-glass w-full max-w-lg p-5 rounded-3xl border border-amber-400/30 relative shadow-2xl flex flex-col max-h-[92vh] overflow-y-auto">
+            <button id="close-settings" class="absolute top-4 right-4 text-slate-300 hover:text-white text-lg font-bold px-3 py-1 bg-white/10 rounded-xl">✕</button>
+            <h2 class="font-cs text-3xl text-amber-400 tracking-wider mb-3">НАСТРОЙКИ CS2 MOBILE</h2>
+
+            <!-- Settings Tabs -->
+            <div class="flex items-center space-x-2 border-b border-white/10 pb-2 mb-4">
+                <button id="tab-btn-graphics" class="setting-tab active px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 transition">
+                    🎮 ГРАФИКА
+                </button>
+                <button id="tab-btn-crosshair" class="setting-tab px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 text-slate-400 transition">
+                    🎯 ПРИЦЕЛ
+                </button>
+            </div>
+
+            <!-- TAB 1: Graphics Settings Content -->
+            <div id="tab-content-graphics" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Пресет графики:</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setGraphicsPreset('low')" id="preset-low" class="px-2 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold hover:border-amber-400 transition">НИЗКИЙ</button>
+                        <button onclick="setGraphicsPreset('med')" id="preset-med" class="px-2 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold hover:border-amber-400 transition">СРЕДНИЙ</button>
+                        <button onclick="setGraphicsPreset('high')" id="preset-high" class="px-2 py-2 bg-slate-900 border border-amber-400 text-amber-300 rounded-xl text-xs font-bold transition">ВЫСОКИЙ</button>
+                        <button onclick="setGraphicsPreset('ultra')" id="preset-ultra" class="px-2 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold hover:border-amber-400 transition">УЛЬТРА</button>
+                    </div>
+                </div>
+
+                <div class="space-y-3 bg-slate-900/60 p-3 rounded-2xl border border-white/10">
+                    <div class="flex items-center justify-between text-xs font-bold">
+                        <span class="text-slate-300">Динамические тени:</span>
+                        <input id="toggle-shadows" type="checkbox" checked class="w-4 h-4 accent-amber-400">
+                    </div>
+                    <div class="flex items-center justify-between text-xs font-bold">
+                        <span class="text-slate-300">Масштаб рендера:</span>
+                        <select id="select-render-scale" class="bg-slate-800 text-amber-300 rounded-lg px-2 py-1 text-xs border border-white/10">
+                            <option value="0.85">0.85x (Производительность)</option>
+                            <option value="1.0">1.0x (Базовое)</option>
+                            <option value="1.5" selected>1.5x (Четкое CS2)</option>
+                            <option value="2.0">2.0x (Retina / Ultra)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between text-xs font-bold">
+                        <span class="text-slate-300">Поле зрения (FOV): <span id="fov-display" class="text-amber-400">72°</span></span>
+                        <input id="slider-fov" type="range" min="60" max="95" value="72" class="w-32 accent-amber-400">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Crosshair Customization Content -->
+            <div id="tab-content-crosshair" class="space-y-4 hidden">
+                <!-- Live Preview Box -->
+                <div class="h-20 bg-slate-900/90 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-r from-amber-950/20 to-sky-950/20"></div>
+                    <div id="crosshair-preview" class="relative flex items-center justify-center">
+                        <div id="preview-ch-top" class="ch-line absolute"></div>
+                        <div id="preview-ch-bottom" class="ch-line absolute"></div>
+                        <div id="preview-ch-left" class="ch-line absolute"></div>
+                        <div id="preview-ch-right" class="ch-line absolute"></div>
+                        <div id="preview-ch-dot" class="absolute rounded-full"></div>
+                        <div id="preview-ch-circle" class="absolute rounded-full border hidden"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">Пресеты киберспортсменов:</label>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <button onclick="applyCrosshairPreset('classic')" class="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[11px] font-bold hover:border-amber-400 transition">КЛАССИК</button>
+                        <button onclick="applyCrosshairPreset('dot')" class="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[11px] font-bold hover:border-amber-400 transition">ТОЧКА</button>
+                        <button onclick="applyCrosshairPreset('circle')" class="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[11px] font-bold hover:border-amber-400 transition">КРУГ</button>
+                        <button onclick="applyCrosshairPreset('box')" class="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[11px] font-bold hover:border-amber-400 transition">КВАДРАТ</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">Цвет прицела:</label>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="setCrosshairColor('#22c55e')" class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white/60 active:scale-90"></button>
+                        <button onclick="setCrosshairColor('#38bdf8')" class="w-7 h-7 rounded-full bg-sky-400 border-2 border-white/60 active:scale-90"></button>
+                        <button onclick="setCrosshairColor('#ef4444')" class="w-7 h-7 rounded-full bg-red-500 border-2 border-white/60 active:scale-90"></button>
+                        <button onclick="setCrosshairColor('#facc15')" class="w-7 h-7 rounded-full bg-yellow-400 border-2 border-white/60 active:scale-90"></button>
+                        <button onclick="setCrosshairColor('#ec4899')" class="w-7 h-7 rounded-full bg-pink-500 border-2 border-white/60 active:scale-90"></button>
+                        <button onclick="setCrosshairColor('#ffffff')" class="w-7 h-7 rounded-full bg-white border-2 border-white/60 active:scale-90"></button>
+                    </div>
+                </div>
+
+                <div class="space-y-2.5 bg-slate-900/60 p-3 rounded-2xl border border-white/10 text-xs font-bold">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Длина линий:</span>
+                        <input id="slider-ch-size" type="range" min="3" max="22" value="9" class="w-32 accent-amber-400">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Зазор (Gap):</span>
+                        <input id="slider-ch-gap" type="range" min="0" max="14" value="4" class="w-32 accent-amber-400">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Толщина:</span>
+                        <input id="slider-ch-thick" type="range" min="1" max="5" value="2" class="w-32 accent-amber-400">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Центральная точка:</span>
+                        <input id="toggle-ch-dot" type="checkbox" checked class="w-4 h-4 accent-amber-400">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CS2 Circular Buy Wheel / Store Modal -->
+    <div id="buy-menu" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+        <div class="cs2-glass w-full max-w-xl p-5 rounded-3xl border border-amber-400/30 relative shadow-2xl">
+            <button id="close-buy" class="absolute top-4 right-4 text-slate-300 hover:text-white text-lg font-bold px-3 py-1 bg-white/10 rounded-xl">✕</button>
+            <div class="flex items-center space-x-3 mb-3">
+                <h2 class="font-cs text-3xl text-amber-400 tracking-wider leading-none">ЗАКУПКА CS2 (DE_DUST2)</h2>
+                <span class="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-cs text-xl">$<span id="buy-money-display">1600</span></span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-4">
+                <button onclick="buyWeapon('usps', 200)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-amber-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-white text-sm">USP-S Tactical</div>
+                        <div class="text-[11px] text-slate-400">Пистолет с глушителем</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$200</span>
+                </button>
+                <button onclick="buyWeapon('deagle', 700)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-amber-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-white text-sm">Desert Eagle</div>
+                        <div class="text-[11px] text-slate-400">Ваншот в голову на любой дистанции</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$700</span>
+                </button>
+                <button onclick="buyWeapon('ak47', 2700)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-amber-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-amber-300 text-sm">AK-47 CS2</div>
+                        <div class="text-[11px] text-slate-400">Штурмовая винтовка (Ваншот в шлем)</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$2700</span>
+                </button>
+                <button onclick="buyWeapon('m4a1', 2900)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-amber-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-sky-300 text-sm">M4A1-S Silenced</div>
+                        <div class="text-[11px] text-slate-400">Лазерная точность без отдачи</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$2900</span>
+                </button>
+                <button onclick="buyWeapon('awp', 4750)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-amber-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-emerald-300 text-sm">AWP Magnum</div>
+                        <div class="text-[11px] text-slate-400">Снайперская винтовка (115 урона в тело)</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$4750</span>
+                </button>
+                <button onclick="buyArmor(650)" class="p-3 bg-slate-900/90 border border-slate-700 hover:border-sky-400 rounded-2xl text-left transition flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-white text-sm">Кевлар + Шлем</div>
+                        <div class="text-[11px] text-slate-400">100 Брони + Полное восстановление HP</div>
+                    </div>
+                    <span class="font-cs text-emerald-400 text-xl mt-2">$650</span>
+                </button>
+            </div>
+
+            <!-- Sensitivity Control -->
+            <div class="flex items-center justify-between bg-slate-900/70 px-4 py-2.5 rounded-2xl border border-white/10">
+                <span class="text-xs font-bold text-slate-300 uppercase">Чувствительность обзора:</span>
+                <input id="sens-slider" type="range" min="1" max="10" value="5" class="w-40 accent-amber-400">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. WEB AUDIO SYNTHESIZER (CS2 Acoustics: Gunshots, Knife, Headshot Dink)
+        // =========================================================================
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function ensureAudio() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type, subtype = 'usps') {
+            ensureAudio();
+            const now = audioCtx.currentTime;
+
+            if (type === 'shoot') {
+                const isSniper = subtype === 'awp';
+                const isSuppressed = (subtype === 'usps' || subtype === 'm4a1');
+
+                // Gunshot crackle noise
+                const bufferSize = audioCtx.sampleRate * (isSniper ? 0.38 : 0.15);
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * (isSniper ? 0.08 : (isSuppressed ? 0.025 : 0.04))));
+                }
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = noiseBuffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = isSuppressed ? 'lowpass' : 'bandpass';
+                filter.frequency.value = isSuppressed ? 1400 : (isSniper ? 600 : 1100);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(isSniper ? 0.75 : (isSuppressed ? 0.32 : 0.48), now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + (isSniper ? 0.36 : 0.14));
+
+                whiteNoise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                whiteNoise.start(now);
+
+                // Deep low-end acoustic thump
+                const osc = audioCtx.createOscillator();
+                const oscGain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(isSniper ? 130 : 220, now);
+                osc.frequency.exponentialRampToValueAtTime(32, now + 0.14);
+                oscGain.gain.setValueAtTime(0.5, now);
+                oscGain.gain.linearRampToValueAtTime(0.01, now + 0.14);
+                osc.connect(oscGain);
+                oscGain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.14);
+            } else if (type === 'knife') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 0.09);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.09);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.09);
+            } else if (type === 'hit') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(820, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.06);
+            } else if (type === 'headshot') {
+                // High frequency metallic "dink" CS2 helmet sound
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(2150, now);
+                osc.frequency.setValueAtTime(2700, now + 0.03);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.16);
+            } else if (type === 'reload') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(360, now);
+                osc.frequency.setValueAtTime(680, now + 0.15);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // =========================================================================
+        // 2. PROCEDURAL CS2 TEXTURE SUITE (Source 2 Bright Limestone, Green Doors, Crates)
+        // =========================================================================
+        function createCS2Textures(renderer) {
+            const maxAniso = renderer.capabilities.getMaxAnisotropy() || 4;
+
+            function makeTex(canvas, repeatX = 1, repeatY = 1) {
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(repeatX, repeatY);
+                tex.anisotropy = maxAniso;
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            // A. CS2 BRIGHT LIMESTONE SANDSTONE WALL (Modern Dust 2 look: crisp, bright mortar)
+            const wallCanvas = document.createElement('canvas');
+            wallCanvas.width = 512;
+            wallCanvas.height = 512;
+            const wCtx = wallCanvas.getContext('2d');
+
+            // Bright sunny base
+            wCtx.fillStyle = '#e5cca8';
+            wCtx.fillRect(0, 0, 512, 512);
+
+            const brickRows = 8;
+            const rH = 512 / brickRows;
+            for (let r = 0; r < brickRows; r++) {
+                const y = r * rH;
+                const cols = 4;
+                const cW = 512 / cols;
+                const offset = (r % 2) * (cW / 2);
+
+                for (let c = -1; c <= cols; c++) {
+                    const x = c * cW + offset;
+                    // Individual block tone variation
+                    const lum = 220 + Math.floor(Math.random() * 26);
+                    wCtx.fillStyle = `rgb(${lum + 12}, ${lum - 8}, ${lum - 42})`;
+                    wCtx.fillRect(x + 2, y + 2, cW - 4, rH - 4);
+
+                    // CS2 light bevel on top/left
+                    wCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    wCtx.fillRect(x + 2, y + 2, cW - 4, 3);
+                    wCtx.fillRect(x + 2, y + 2, 3, rH - 4);
+
+                    // Soft shadow bevel on bottom/right
+                    wCtx.fillStyle = 'rgba(110, 80, 45, 0.28)';
+                    wCtx.fillRect(x + 2, y + rH - 5, cW - 4, 3);
+                    wCtx.fillRect(x + cW - 5, y + 2, 3, rH - 4);
+                }
+            }
+            // Fine sand grain noise
+            for (let i = 0; i < 4000; i++) {
+                wCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(80,55,25,0.08)';
+                wCtx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+
+            // B. CS2 DUST 2 GREEN DOUBLE DOORS TEXTURE
+            const doorCanvas = document.createElement('canvas');
+            doorCanvas.width = 512;
+            doorCanvas.height = 512;
+            const dCtx = doorCanvas.getContext('2d');
+
+            // Dark olive green paint
+            dCtx.fillStyle = '#314436';
+            dCtx.fillRect(0, 0, 512, 512);
+
+            // Left & Right door panels
+            dCtx.fillStyle = '#28382c';
+            dCtx.fillRect(16, 16, 230, 480);
+            dCtx.fillRect(266, 16, 230, 480);
+
+            // Center door gap shadow
+            dCtx.fillStyle = '#101712';
+            dCtx.fillRect(250, 0, 12, 512);
+
+            // Metal reinforcement crossbars & rivets
+            dCtx.fillStyle = '#1e2920';
+            [80, 240, 400].forEach(barY => {
+                dCtx.fillRect(16, barY, 230, 24);
+                dCtx.fillRect(266, barY, 230, 24);
+
+                // Silver rivets
+                for (let rx = 40; rx < 230; rx += 45) {
+                    dCtx.fillStyle = '#94a3b8';
+                    dCtx.beginPath();
+                    dCtx.arc(rx, barY + 12, 4, 0, Math.PI * 2);
+                    dCtx.arc(rx + 250, barY + 12, 4, 0, Math.PI * 2);
+                    dCtx.fill();
+                    dCtx.fillStyle = '#1e2920';
+                }
+            });
+
+            // Door handle metal plate
+            dCtx.fillStyle = '#0f172a';
+            dCtx.fillRect(220, 220, 16, 64);
+            dCtx.fillRect(276, 220, 16, 64);
+
+            // Stencil warning "CS2 DOORS"
+            dCtx.fillStyle = 'rgba(245, 158, 11, 0.7)';
+            dCtx.font = 'bold 24px Rajdhani, sans-serif';
+            dCtx.textAlign = 'center';
+            dCtx.fillText('RESTRICTED', 131, 140);
+            dCtx.fillText('MILITARY', 381, 140);
+
+            // C. BOMBSITE [A] MILITARY CRATE TEXTURE
+            function createCrateTexture(siteLabel) {
+                const cCanvas = document.createElement('canvas');
+                cCanvas.width = 512;
+                cCanvas.height = 512;
+                const ctx = cCanvas.getContext('2d');
+
+                // Rich pine wood
+                ctx.fillStyle = '#9c6b3e';
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Horizontal planks
+                for (let p = 0; p < 5; p++) {
+                    const py = p * (512 / 5);
+                    ctx.fillStyle = p % 2 === 0 ? '#916135' : '#a27142';
+                    ctx.fillRect(0, py, 512, 512 / 5 - 3);
+                    ctx.fillStyle = '#4a2f15';
+                    ctx.fillRect(0, py + 512 / 5 - 3, 512, 3);
+                }
+
+                // Diagonal cross brace
+                ctx.strokeStyle = '#7c4e24';
+                ctx.lineWidth = 42;
+                ctx.beginPath();
+                ctx.moveTo(35, 35);
+                ctx.lineTo(477, 477);
+                ctx.stroke();
+
+                // Heavy metal edge brackets
+                ctx.lineWidth = 32;
+                ctx.strokeStyle = '#683f1c';
+                ctx.strokeRect(16, 16, 480, 480);
+
+                // Corner steel reinforcements
+                ctx.fillStyle = '#334155';
+                [[0,0],[448,0],[0,448],[448,448]].forEach(([cx, cy]) => {
+                    ctx.fillRect(cx, cy, 64, 64);
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.beginPath();
+                    ctx.arc(cx + 32, cy + 32, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#334155';
+                });
+
+                // CS2 Bombsite Stencil Badge
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                ctx.fillRect(96, 190, 320, 130);
+                ctx.strokeStyle = siteLabel === 'A' ? '#f59e0b' : '#38bdf8';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(96, 190, 320, 130);
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 38px Rajdhani, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`BOMBSITE [${siteLabel}]`, 256, 245);
+                ctx.fillStyle = '#f59e0b';
+                ctx.font = 'bold 22px Rajdhani, sans-serif';
+                ctx.fillText('EXPLOSIVE ORDNANCE', 256, 285);
+
+                return cCanvas;
+            }
+
+            // D. CS2 BRIGHT ASPHALT / CONCRETE GROUND WITH DUST
+            const floorCanvas = document.createElement('canvas');
+            floorCanvas.width = 512;
+            floorCanvas.height = 512;
+            const fCtx = floorCanvas.getContext('2d');
+
+            fCtx.fillStyle = '#cfbda1'; // Bright desert sun ground
+            fCtx.fillRect(0, 0, 512, 512);
+
+            // Flagstone tile divisions
+            const tiles = 8;
+            const tSz = 512 / tiles;
+            for (let y = 0; y < tiles; y++) {
+                for (let x = 0; x < tiles; x++) {
+                    const v = 200 + Math.floor(Math.random() * 24);
+                    fCtx.fillStyle = `rgb(${v + 8}, ${v - 5}, ${v - 30})`;
+                    fCtx.fillRect(x * tSz + 2, y * tSz + 2, tSz - 4, tSz - 4);
+                    fCtx.strokeStyle = 'rgba(120, 95, 65, 0.25)';
+                    fCtx.lineWidth = 2;
+                    fCtx.strokeRect(x * tSz + 2, y * tSz + 2, tSz - 4, tSz - 4);
+                }
+            }
+            for (let i = 0; i < 5000; i++) {
+                fCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(70,50,25,0.08)';
+                fCtx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+
+            // E. TERRORIST BOT FACE TEXTURE (CS2 Leet Balaclava + Aviators)
+            const faceCanvas = document.createElement('canvas');
+            faceCanvas.width = 128;
+            faceCanvas.height = 128;
+            const faCtx = faceCanvas.getContext('2d');
+
+            faCtx.fillStyle = '#991b1b'; // Maroon desert keffiyeh
+            faCtx.fillRect(0, 0, 128, 128);
+            faCtx.fillStyle = '#f8fafc';
+            for (let y = 0; y < 128; y += 16) {
+                for (let x = 0; x < 128; x += 16) {
+                    if ((x + y) % 32 === 0) faCtx.fillRect(x, y, 8, 8);
+                }
+            }
+            // Eye cut out
+            faCtx.fillStyle = '#d49b73';
+            faCtx.fillRect(18, 38, 92, 34);
+            // Aviator Sunglasses
+            faCtx.fillStyle = '#0f172a';
+            faCtx.fillRect(24, 44, 34, 22);
+            faCtx.fillRect(70, 44, 34, 22);
+            faCtx.fillRect(58, 48, 12, 6);
+            // Lens Glare
+            faCtx.fillStyle = '#38bdf8';
+            faCtx.fillRect(28, 48, 8, 5);
+            faCtx.fillRect(74, 48, 8, 5);
+
+            return {
+                wall: makeTex(wallCanvas, 2, 1),
+                wallLong: makeTex(wallCanvas, 8, 1),
+                doors: makeTex(doorCanvas, 1, 1),
+                crateA: makeTex(createCrateTexture('A'), 1, 1),
+                crateB: makeTex(createCrateTexture('B'), 1, 1),
+                floor: makeTex(floorCanvas, 24, 24),
+                botFace: makeTex(faceCanvas, 1, 1)
+            };
+        }
+
+        // =========================================================================
+        // 3. THREE.JS ENGINE SETUP & CS2 ENVIRONMENT LIGHTING
+        // =========================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Source 2 / CS2 ACES Filmic Tone Mapping & High Exposure
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.18;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xbfe0f7); // Sunny blue sky
+        scene.fog = new THREE.FogExp2(0xf5eedb, 0.009); // Desert atmospheric haze
+
+        const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 160);
+        scene.add(camera);
+
+        // Lighting: Warm Moroccan Sun + Crisp Blue Ambient
+        const hemiLight = new THREE.HemisphereLight(0xfff5ea, 0x947c61, 0.85);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 1.35);
+        sunLight.position.set(45, 60, 35);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        sunLight.shadow.camera.near = 1;
+        sunLight.shadow.camera.far = 140;
+        const shRange = 55;
+        sunLight.shadow.camera.left = -shRange;
+        sunLight.shadow.camera.right = shRange;
+        sunLight.shadow.camera.top = shRange;
+        sunLight.shadow.camera.bottom = -shRange;
+        scene.add(sunLight);
+
+        const textures = createCS2Textures(renderer);
+
+        // Main Ground
+        const groundGeo = new THREE.PlaneGeometry(120, 120);
+        const groundMat = new THREE.MeshLambertMaterial({ map: textures.floor });
+        const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+        groundMesh.rotation.x = -Math.PI / 2;
+        groundMesh.receiveShadow = true;
+        scene.add(groundMesh);
+
+        // Map Colliders & Meshes list for bullet raycasting
+        const mapColliders = [];
+        const wallMeshes = [];
+
+        function addBox(x, y, z, w, h, d, material, isCrate = false, tag = '') {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.position.set(x, y + h / 2, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            wallMeshes.push(mesh);
+            mapColliders.push({
+                minX: x - w / 2,
+                maxX: x + w / 2,
+                minY: y,
+                maxY: y + h,
+                minZ: z - d / 2,
+                maxZ: z + d / 2,
+                isCrate,
+                tag
+            });
+            return mesh;
+        }
+
+        const wallMat = new THREE.MeshLambertMaterial({ map: textures.wall });
+        const perimMat = new THREE.MeshLambertMaterial({ map: textures.wallLong });
+        const doorMat = new THREE.MeshLambertMaterial({ map: textures.doors });
+        const crateAMat = new THREE.MeshLambertMaterial({ map: textures.crateA });
+        const crateBMat = new THREE.MeshLambertMaterial({ map: textures.crateB });
+
+        // =========================================================================
+        // 4. ACCURATE DE_DUST2 MAP LAYOUT ARCHITECTURE
+        // =========================================================================
+        // Map size approx: -48 to +48 X, -48 to +48 Z
+        const W_H = 6.0; // Wall height
+
+        // 1. OUTER BOUNDARY PERIMETER
+        addBox(0, 0, -48, 96, W_H, 1.8, perimMat);
+        addBox(0, 0, 48, 96, W_H, 1.8, perimMat);
+        addBox(-48, 0, 0, 1.8, W_H, 96, perimMat);
+        addBox(48, 0, 0, 1.8, W_H, 96, perimMat);
+
+        // 2. MID AREA (Center spine: Z from -30 to +25, X around 0)
+        // Mid Double Doors divider
+        addBox(-6.5, 0, 0, 7.5, W_H, 1.8, wallMat);
+        addBox(6.5, 0, 0, 7.5, W_H, 1.8, wallMat);
+        // The green double doors with gap to peek Suicide
+        addBox(-1.4, 0, 0, 2.3, W_H, 0.4, doorMat);
+        addBox(1.4, 0, 0, 2.3, W_H, 0.4, doorMat);
+
+        // Xbox Crate in Mid
+        addBox(2.2, 0, -7.5, 2.3, 2.3, 2.3, crateAMat, true);
+
+        // Mid West Wall separating Mid from Lower Tunnels
+        addBox(-10.5, 0, -10, 1.8, W_H, 16, wallMat);
+
+        // 3. SHORT A / CATWALK (Connecting Mid to Site A platform)
+        // Catwalk wall along Mid
+        addBox(10.5, 0, -10, 1.8, W_H, 16, wallMat);
+        // Short A elevated walkway platform (1.4m high)
+        addBox(15.5, 0, -18, 8, 1.4, 12, wallMat, true, 'CATWALK');
+        // Steps up from Mid to Catwalk
+        addBox(12.5, 0, -10, 3, 0.7, 3, wallMat, true);
+
+        // 4. BOMBSITE A & LONG A (East quadrant: X +18 to +42, Z -40 to +30)
+        // Bombsite A elevated main platform
+        addBox(28, 0, -28, 18, 1.4, 18, wallMat, true, 'SITE_A');
+        // A Site Default Crates (Ninja, Triple stack)
+        addBox(26, 1.4, -26, 2.2, 2.2, 2.2, crateAMat, true);
+        addBox(28.4, 1.4, -26, 2.2, 2.2, 2.2, crateAMat, true);
+        addBox(27.2, 3.6, -26, 2.0, 2.0, 2.0, crateAMat, true); // Stacked
+        addBox(34, 1.4, -22, 2.2, 2.2, 2.2, crateAMat, true); // Goose / Ramp crate
+
+        // Long A Wall divider
+        addBox(20, 0, 6, 1.8, W_H, 32, wallMat);
+        // Long Doors (Connecting T side to Long A)
+        addBox(28, 0, 22, 8, W_H, 1.8, wallMat);
+        addBox(34.5, 0, 22, 2.5, W_H, 0.4, doorMat); // Long Door 1
+        addBox(37.5, 0, 22, 2.5, W_H, 0.4, doorMat); // Long Door 2
+        addBox(43, 0, 22, 8, W_H, 1.8, wallMat);
+
+        // Pit Area Crates & Cover
+        addBox(35, 0, 14, 2.2, 2.2, 2.2, crateAMat, true);
+        addBox(37.4, 0, 14, 2.2, 2.2, 2.2, crateAMat, true);
+
+        // 5. BOMBSITE B & UPPER TUNNELS (West quadrant: X -18 to -44, Z -10 to -42)
+        // Bombsite B Main Wall
+        addBox(-26, 0, -18, 18, W_H, 1.8, wallMat);
+        // B Double Doors
+        addBox(-33.5, 0, -18, 2.4, W_H, 0.4, doorMat);
+        addBox(-36, 0, -18, 2.4, W_H, 0.4, doorMat);
+        // B Window from CT crossover
+        addBox(-20, 1.5, -28, 1.8, 3.0, 4, wallMat, true);
+
+        // B Site Crates (Default Plant, Car / Platform boxes)
+        addBox(-32, 0, -32, 2.4, 2.4, 2.4, crateBMat, true, 'SITE_B');
+        addBox(-34.6, 0, -32, 2.4, 2.4, 2.4, crateBMat, true);
+        addBox(-33.3, 2.4, -32, 2.2, 2.2, 2.2, crateBMat, true); // Stacked B crate
+        addBox(-40, 0, -25, 2.2, 2.2, 2.2, crateBMat, true);
+
+        // Upper Tunnels corridor walls
+        addBox(-28, 0, 4, 1.8, W_H, 26, wallMat);
+        addBox(-38, 0, 4, 1.8, W_H, 26, wallMat);
+
+        // 6. CT SPAWN & T SPAWN DIVIDERS
+        // CT Spawn crossover ramp between A and B
+        addBox(0, 0, -36, 22, W_H, 1.8, wallMat);
+        // T Spawn platform barrier
+        addBox(0, 0, 36, 26, 1.5, 8, wallMat, true);
+
+        // =========================================================================
+        // 5. FIRST-PERSON WEAPON ARSENAL & 3D VIEWMODELS
+        // =========================================================================
+        const weapons = {
+            knife:  { name: 'TACTICAL KNIFE', type: 'melee', damage: 65,  fireRate: 380, clip: 1,  maxClip: 1,  auto: false, recoil: 0.02 },
+            usps:   { name: 'USP-S SILENCED', type: 'pistol',damage: 35,  fireRate: 175, clip: 12, maxClip: 60, auto: false, recoil: 0.035 },
+            deagle: { name: 'DESERT EAGLE',   type: 'pistol',damage: 70,  fireRate: 350, clip: 7,  maxClip: 35, auto: false, recoil: 0.085 },
+            ak47:   { name: 'AK-47 CS2',      type: 'primary',damage: 42, fireRate: 110, clip: 30, maxClip: 90, auto: true,  recoil: 0.045 },
+            m4a1:   { name: 'M4A1-S SILENCED',type: 'primary',damage: 38, fireRate: 100, clip: 25, maxClip: 75, auto: true,  recoil: 0.028 },
+            awp:    { name: 'AWP MAGNUM',     type: 'primary',damage: 115,fireRate: 950, clip: 10, maxClip: 30, auto: false, recoil: 0.14  }
+        };
+
+        const weaponGroup = new THREE.Group();
+        camera.add(weaponGroup);
+
+        const flashMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0 });
+        const muzzleFlashMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), flashMat);
+        weaponGroup.add(muzzleFlashMesh);
+
+        function buildWeaponModel(type) {
+            for (let i = weaponGroup.children.length - 1; i >= 0; i--) {
+                if (weaponGroup.children[i] !== muzzleFlashMesh) {
+                    weaponGroup.remove(weaponGroup.children[i]);
+                }
+            }
+
+            const gunGroup = new THREE.Group();
+            const darkSteel = new THREE.MeshStandardMaterial({ color: 0x18202a, roughness: 0.28, metalness: 0.88 });
+            const gunMetal = new THREE.MeshStandardMaterial({ color: 0x273549, roughness: 0.35, metalness: 0.82 });
+            const chrome = new THREE.MeshStandardMaterial({ color: 0xecf0f5, roughness: 0.15, metalness: 0.95 });
+            const akWood = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.55 });
+            const gloveMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+            const strapMat = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
+            const skinMat = new THREE.MeshLambertMaterial({ color: 0xd4a373 });
+
+            // High-detail Tactical CT Arm & Hand (Palm, knuckles, thumb and wrapped fingers)
+            const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.065, 0.32, 10), gloveMat);
+            arm.rotation.x = Math.PI / 2.7;
+            arm.position.set(0.02, -0.16, 0.2);
+            const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.04, 10), strapMat);
+            strap.rotation.x = Math.PI / 2.7;
+            strap.position.set(0.02, -0.12, 0.14);
+            const palm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.075, 0.11), gloveMat);
+            palm.position.set(0, -0.07, 0.04);
+            // 4 articulated fingers wrapping the gun grip
+            for (let f = 0; f < 4; f++) {
+                const finger = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.048, 0.024), gloveMat);
+                finger.position.set(-0.038, -0.065 - f * 0.016, 0.03 + (f === 0 ? -0.02 : 0));
+                finger.rotation.z = 0.45;
+                gunGroup.add(finger);
+            }
+            // Thumb
+            const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.05), gloveMat);
+            thumb.position.set(0.038, -0.05, 0.03);
+            thumb.rotation.y = -0.3;
+            gunGroup.add(arm, strap, palm, thumb);
+
+            if (type === 'knife') {
+                // Tactical Karambit / Combat Bayonet
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.065, 0.32), chrome);
+                blade.position.set(0, 0.02, -0.18);
+                blade.rotation.x = -0.08;
+                // Serrated back
+                const serration = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.02, 0.14), darkSteel);
+                serration.position.set(0, 0.055, -0.12);
+                const guard = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.02), darkSteel);
+                guard.position.set(0, 0.01, -0.02);
+                const handle = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.05, 0.16), darkSteel);
+                handle.position.set(0, -0.01, 0.07);
+                // Finger ring at bottom of grip
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.007, 8, 16), darkSteel);
+                ring.position.set(0, -0.01, 0.17);
+                gunGroup.add(blade, serration, guard, handle, ring);
+                muzzleFlashMesh.position.set(0.24, -0.18, -0.45);
+            } else if (type === 'usps') {
+                // USP-S Tactical with grooved silencer
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.065, 0.24), darkSteel);
+                const slide = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.042, 0.25), chrome);
+                slide.position.set(0, 0.035, 0);
+                const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.02, 0.02), darkSteel);
+                hammer.position.set(0, 0.05, 0.12);
+                const grip = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.14, 0.08), darkSteel);
+                grip.position.set(0, -0.07, 0.06);
+                grip.rotation.x = 0.24;
+                // Long Tactical Silencer with threading
+                const silencer = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.26, 14), darkSteel);
+                silencer.rotation.x = Math.PI / 2;
+                silencer.position.set(0, 0.03, -0.25);
+                const silencerCap = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.03, 14), chrome);
+                silencerCap.rotation.x = Math.PI / 2;
+                silencerCap.position.set(0, 0.03, -0.37);
+                gunGroup.add(frame, slide, hammer, grip, silencer, silencerCap);
+                muzzleFlashMesh.position.set(0.24, -0.17, -0.84);
+            } else if (type === 'deagle') {
+                // High-poly Desert Eagle with stepped slide & beavertail
+                const slide = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.09, 0.35), chrome);
+                const steppedNose = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.07, 0.12), chrome);
+                steppedNose.position.set(0, -0.01, -0.18);
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.06, 0.26), darkSteel);
+                frame.position.set(0, -0.03, 0);
+                const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.17, 0.095), darkSteel);
+                grip.position.set(0, -0.09, 0.09);
+                grip.rotation.x = 0.26;
+                const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.03, 0.03), darkSteel);
+                hammer.position.set(0, 0.045, 0.17);
+                const triggerGuard = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.006, 8, 12, Math.PI), chrome);
+                triggerGuard.rotation.y = Math.PI / 2;
+                triggerGuard.position.set(0, -0.06, 0.02);
+                gunGroup.add(slide, steppedNose, frame, grip, hammer, triggerGuard);
+                muzzleFlashMesh.position.set(0.24, -0.17, -0.74);
+            } else if (type === 'ak47') {
+                // AK-47 CS2: Curved banana mag, gas block, wooden stock & front sight post
+                const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.095, 0.4), darkSteel);
+                const topCover = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.36, 12, 1, false, 0, Math.PI), gunMetal);
+                topCover.rotation.z = Math.PI / 2;
+                topCover.rotation.y = Math.PI / 2;
+                topCover.position.set(0, 0.05, 0.01);
+                // Real AK curved banana magazine (3 angled segments)
+                const mag1 = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.09, 0.07), akWood);
+                mag1.position.set(0, -0.08, -0.08);
+                mag1.rotation.x = -0.25;
+                const mag2 = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.09, 0.07), akWood);
+                mag2.position.set(0, -0.15, -0.06);
+                mag2.rotation.x = -0.45;
+                const woodenStock = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.12, 0.28), akWood);
+                woodenStock.position.set(0, -0.04, 0.32);
+                woodenStock.rotation.x = -0.14;
+                const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.066, 0.075, 0.24), akWood);
+                handguard.position.set(0, 0.005, -0.28);
+                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.38, 10), darkSteel);
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0.015, -0.52);
+                // Gas Tube on top of barrel
+                const gasTube = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 10), gunMetal);
+                gasTube.rotation.x = Math.PI / 2;
+                gasTube.position.set(0, 0.042, -0.36);
+                // Front sight post ring
+                const sight = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.005, 8, 12), darkSteel);
+                sight.position.set(0, 0.05, -0.62);
+                // Slanted AK muzzle compensator
+                const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.06, 10), darkSteel);
+                muzzle.rotation.x = Math.PI / 2;
+                muzzle.position.set(0, 0.015, -0.71);
+                gunGroup.add(receiver, topCover, mag1, mag2, woodenStock, handguard, barrel, gasTube, sight, muzzle);
+                muzzleFlashMesh.position.set(0.24, -0.17, -1.02);
+            } else if (type === 'm4a1') {
+                // M4A1-S with Picatinny Top Rail, STANAG Mag & Fluted Suppressor
+                const upper = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.34), darkSteel);
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.018, 0.32), gunMetal);
+                rail.position.set(0, 0.045, -0.02);
+                const handguard = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.28, 12), darkSteel);
+                handguard.rotation.x = Math.PI / 2;
+                handguard.position.set(0, 0.01, -0.28);
+                const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.11, 0.24), darkSteel);
+                stock.position.set(0, -0.03, 0.26);
+                const stanagMag = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.18, 0.07), chrome);
+                stanagMag.position.set(0, -0.11, -0.09);
+                stanagMag.rotation.x = -0.15;
+                const suppressor = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.34, 14), gunMetal);
+                suppressor.rotation.x = Math.PI / 2;
+                suppressor.position.set(0, 0.01, -0.58);
+                const supRing = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.005, 8, 16), chrome);
+                supRing.position.set(0, 0.01, -0.46);
+                gunGroup.add(upper, rail, handguard, stock, stanagMag, suppressor, supRing);
+                muzzleFlashMesh.position.set(0.24, -0.17, -1.04);
+            } else if (type === 'awp') {
+                // AWP CS2: Thumbhole Green Chassis, Dual-Ring Scope, Folded Bipod & Muzzle Brake
+                const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.11, 0.68), new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.6 }));
+                const thumbHole = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+                thumbHole.position.set(0, -0.02, 0.18);
+                const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.36), darkSteel);
+                receiver.position.set(0, 0.04, -0.06);
+                const flutedBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 0.62, 14), darkSteel);
+                flutedBarrel.rotation.x = Math.PI / 2;
+                flutedBarrel.position.set(0, 0.03, -0.66);
+                // Massive Muzzle Brake with gas ports
+                const muzzleBrake = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.042, 0.12), gunMetal);
+                muzzleBrake.position.set(0, 0.03, -0.98);
+                // Detailed Optic Sniper Scope with mounting rings & adjustment turrets
+                const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.38, 14), darkSteel);
+                scopeBody.rotation.x = Math.PI / 2;
+                scopeBody.position.set(0, 0.11, -0.06);
+                const scopeBell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.034, 0.1, 14), darkSteel);
+                scopeBell.rotation.x = Math.PI / 2;
+                scopeBell.position.set(0, 0.11, -0.28);
+                const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.025, 10), chrome);
+                turret.position.set(0, 0.15, -0.06);
+                // Folded Bipod under barrel
+                const bipod = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.22), darkSteel);
+                bipod.position.set(0, -0.03, -0.48);
+                gunGroup.add(chassis, receiver, flutedBarrel, muzzleBrake, scopeBody, scopeBell, turret, bipod);
+                muzzleFlashMesh.position.set(0.24, -0.16, -1.22);
+            }
+
+            gunGroup.position.set(0.24, -0.2, -0.42);
+            weaponGroup.add(gunGroup);
+        }
+
+        // =========================================================================
+        // 6. ARTICULATED TERRORIST BOTS (Tactical Vest, Helmets & Pouches)
+        // =========================================================================
+        const bots = [];
+        const botHitboxes = [];
+
+        function createBot(x, z, patrolKey = 'LONG') {
+            const botGroup = new THREE.Group();
+            botGroup.position.set(x, 0, z);
+
+            const pantsMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+            const vestMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+            const pouchMat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+            const shirtMat = new THREE.MeshLambertMaterial({ color: 0x991b1b });
+            const headMat = new THREE.MeshLambertMaterial({ map: textures.botFace });
+            const bootMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+            const lensMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.9 });
+
+            // Legs with Kneepads & Combat Boots
+            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.78, 0.26), pantsMat);
+            leftLeg.position.set(-0.16, 0.44, 0);
+            leftLeg.castShadow = true;
+            const leftKnee = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.08), vestMat);
+            leftKnee.position.set(-0.16, 0.44, 0.14);
+            const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 0.34), bootMat);
+            leftBoot.position.set(-0.16, 0.08, 0.03);
+
+            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.78, 0.26), pantsMat);
+            rightLeg.position.set(0.16, 0.44, 0);
+            rightLeg.castShadow = true;
+            const rightKnee = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.08), vestMat);
+            rightKnee.position.set(0.16, 0.44, 0.14);
+            const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 0.34), bootMat);
+            rightBoot.position.set(0.16, 0.08, 0.03);
+
+            // Detailed Torso with MOLLE Plate Carrier & 3 Front Ammo Pouches
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.82, 0.36), shirtMat);
+            torso.position.set(0, 1.25, 0);
+            torso.castShadow = true;
+
+            const plateCarrier = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.68, 0.42), vestMat);
+            plateCarrier.position.set(0, 1.26, 0);
+            // 3 Tactical Mag Pouches on chest
+            for (let p = -1; p <= 1; p++) {
+                const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.09), pouchMat);
+                pouch.position.set(p * 0.18, 1.15, 0.24);
+                botGroup.add(pouch);
+            }
+
+            // Head with Helmet & 3D Aviator Glasses
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), headMat);
+            head.position.set(0, 1.9, 0);
+            head.castShadow = true;
+
+            const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10, 0, Math.PI * 2, 0, Math.PI / 1.7), vestMat);
+            helmet.position.set(0, 2.05, -0.02);
+            // 3D Aviators on bot face
+            const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.1, 0.06), lensMat);
+            glasses.position.set(0, 1.92, 0.22);
+
+            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.65, 0.2), shirtMat);
+            leftArm.position.set(-0.42, 1.32, 0.15);
+            leftArm.rotation.x = -Math.PI / 3;
+
+            const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.65, 0.2), shirtMat);
+            rightArm.position.set(0.42, 1.32, 0.15);
+            rightArm.rotation.x = -Math.PI / 3;
+
+            // Detailed bot AK-47
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.78), new THREE.MeshLambertMaterial({ color: 0x111827 }));
+            gun.position.set(0.22, 1.28, 0.45);
+
+            // Overhead Health Bar
+            const hpBg = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.1), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide }));
+            hpBg.position.set(0, 2.38, 0);
+            const hpFill = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 0.07), new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide }));
+            hpFill.position.set(0, 2.38, 0.01);
+
+            botGroup.add(leftLeg, leftKnee, leftBoot, rightLeg, rightKnee, rightBoot, torso, plateCarrier, head, helmet, glasses, leftArm, rightArm, gun, hpBg, hpFill);
+            scene.add(botGroup);
+
+            const bot = {
+                group: botGroup,
+                head,
+                torso,
+                leftLeg,
+                rightLeg,
+                hpBg,
+                hpFill,
+                hp: 100,
+                shootTimer: Math.random() * 800,
+                strafeDir: Math.random() > 0.5 ? 1 : -1,
+                walkCycle: Math.random() * 10,
+                patrolKey
+            };
+
+            [torso, leftLeg, rightLeg, leftArm, rightArm, plateCarrier].forEach(m => {
+                m.userData = { bot, isHead: false };
+                botHitboxes.push(m);
+            });
+            head.userData = { bot, isHead: true };
+            helmet.userData = { bot, isHead: true };
+            botHitboxes.push(head, helmet);
+
+            bots.push(bot);
+            return bot;
+        }
+
+        function spawnDust2Bots() {
+            bots.forEach(b => scene.remove(b.group));
+            bots.length = 0;
+            botHitboxes.length = 0;
+
+            // Authentic Dust 2 Bot Choke Points
+            createBot(36, 12, 'LONG_PIT');       // Long A / Pit
+            createBot(16, -16, 'SHORT_CAT');     // Catwalk / Short A
+            createBot(0, -6, 'MID_XBOX');        // Mid Double Doors
+            createBot(-32, -26, 'B_SITE');       // Bombsite B Platform
+            createBot(-34, 10, 'UPPER_TUNNELS'); // Upper Tunnels
+            updateScoreboardAvatars();
+        }
+
+        // =========================================================================
+        // 7. PLAYER CONTROLLER, INVENTORY & COLLISION LOGIC
+        // =========================================================================
+        const player = {
+            x: 28, // Start at CT Long Ramp overlooking Long A
+            y: 1.7,
+            z: -20,
+            vy: 0,
+            onGround: true,
+            yaw: Math.PI,
+            pitch: 0,
+            hp: 100,
+            armor: 100,
+            money: 1600,
+            weapon: 'usps',
+            activeSlot: 'pistol',
+            inventory: {
+                knife: 'knife',
+                pistol: 'usps',
+                primary: 'ak47'
+            },
+            ammo: 12,
+            maxAmmo: 60,
+            scoped: false,
+            reloading: false,
+            reloadProgress: 0,
+            recoilOffset: 0,
+            walkBob: 0
+        };
+
+        let scoreCT = 0;
+        let scoreT = 0;
+        let roundSeconds = 115;
+        let autoFireEnabled = true;
+        let lookSensitivity = 0.0042;
+        let isFiringHold = false;
+        let lastShotTime = 0;
+
+        buildWeaponModel(player.weapon);
+        spawnDust2Bots();
+
+        function canMoveTo(nx, nz, py) {
+            const rad = 0.55;
+            if (nx < -46 || nx > 46 || nz < -46 || nz > 46) return false;
+
+            for (let i = 0; i < mapColliders.length; i++) {
+                const c = mapColliders[i];
+                if (py - 1.55 >= c.maxY - 0.15) continue; // Walk over platform/crate
+                if (nx + rad > c.minX && nx - rad < c.maxX &&
+                    nz + rad > c.minZ && nz - rad < c.maxZ) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function getGroundHeight(px, pz) {
+            let maxH = 0;
+            const rad = 0.45;
+            for (let i = 0; i < mapColliders.length; i++) {
+                const c = mapColliders[i];
+                if (c.maxY > maxH &&
+                    px + rad > c.minX && px - rad < c.maxX &&
+                    pz + rad > c.minZ && pz - rad < c.maxZ) {
+                    maxH = c.maxY;
+                }
+            }
+            return maxH;
+        }
+
+        function getPlayerLocationName() {
+            if (player.z > 16 && player.x > 18) return 'LONG A / PIT';
+            if (player.x > 18 && player.z < -16) return 'BOMBSITE A';
+            if (player.x > 8 && player.x <= 18 && player.z < -10) return 'CATWALK';
+            if (Math.abs(player.x) <= 8 && player.z < 10) return 'MID DOORS';
+            if (player.x < -18 && player.z < -18) return 'BOMBSITE B';
+            if (player.x < -18 && player.z >= -10) return 'TUNNELS';
+            return 'CT MID';
+        }
+
+        // Raycasting for bullet impacts
+        const raycaster = new THREE.Raycaster();
+        const screenCenter = new THREE.Vector2(0, 0);
+
+        function spawnFloatingDamage(dmg, isHeadshot, worldPos) {
+            const vec = worldPos.clone().project(camera);
+            const sx = (vec.x * 0.5 + 0.5) * window.innerWidth;
+            const sy = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+
+            const el = document.createElement('div');
+            el.className = 'floating-dmg ' + (isHeadshot ? 'text-amber-300 text-2xl' : 'text-red-400');
+            el.style.left = `${sx}px`;
+            el.style.top = `${sy}px`;
+            el.innerText = isHeadshot ? `💥 -${dmg} HEADSHOT!` : `-${dmg}`;
+            document.getElementById('damage-numbers').appendChild(el);
+            setTimeout(() => el.remove(), 750);
+        }
+
+        function showRoundBanner(text) {
+            const banner = document.getElementById('round-banner');
+            document.getElementById('round-banner-text').innerText = text;
+            banner.style.opacity = '1';
+            setTimeout(() => { banner.style.opacity = '0'; }, 2400);
+        }
+
+        function triggerReload() {
+            const w = weapons[player.weapon];
+            if (w.type === 'melee' || player.reloading || player.ammo === w.clip || player.maxAmmo <= 0) return;
+            player.reloading = true;
+            player.reloadProgress = 0;
+            if (player.scoped) toggleScope(false);
+            playSound('reload');
+        }
+
+        function toggleScope(forceState) {
+            player.scoped = typeof forceState === 'boolean' ? forceState : !player.scoped;
+            const scopeOverlay = document.getElementById('scope-overlay');
+            if (player.scoped) {
+                if (player.weapon === 'awp') {
+                    camera.fov = 22;
+                    scopeOverlay.style.display = 'block';
+                    weaponGroup.visible = false;
+                } else {
+                    camera.fov = 50;
+                    scopeOverlay.style.display = 'none';
+                    weaponGroup.visible = true;
+                }
+            } else {
+                camera.fov = 72;
+                scopeOverlay.style.display = 'none';
+                weaponGroup.visible = true;
+            }
+            camera.updateProjectionMatrix();
+        }
+
+        function fireWeapon() {
+            if (player.reloading) return;
+            const now = performance.now();
+            const w = weapons[player.weapon];
+            if (now - lastShotTime < w.fireRate) return;
+
+            if (w.type !== 'melee') {
+                if (player.ammo <= 0) {
+                    triggerReload();
+                    return;
+                }
+                player.ammo--;
+                playSound('shoot', player.weapon);
+                flashMat.opacity = 1.0;
+                muzzleFlashMesh.rotation.z = Math.random() * Math.PI;
+                player.recoilOffset = w.recoil;
+                player.pitch = Math.min(Math.PI / 2.2, player.pitch + w.recoil * 0.4);
+            } else {
+                playSound('knife');
+                player.recoilOffset = 0.05;
+            }
+
+            lastShotTime = now;
+            updateHUD();
+
+            // Raycast shot check
+            raycaster.setFromCamera(screenCenter, camera);
+            const wallHits = raycaster.intersectObjects(wallMeshes, false);
+            const closestWallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+
+            const botHits = raycaster.intersectObjects(botHitboxes, false);
+            if (botHits.length > 0 && botHits[0].distance < closestWallDist) {
+                const hit = botHits[0];
+                const { bot, isHead } = hit.object.userData;
+                if (bot && bot.hp > 0) {
+                    const finalDmg = isHead ? Math.round(w.damage * 2.5) : w.damage;
+                    bot.hp -= finalDmg;
+
+                    // Update bot overhead HP bar
+                    const hpRatio = Math.max(0, bot.hp / 100);
+                    bot.hpFill.scale.x = Math.max(0.001, hpRatio);
+
+                    playSound(isHead ? 'headshot' : 'hit');
+                    spawnFloatingDamage(finalDmg, isHead, hit.point);
+
+                    // Flash CS2 Hitmarker
+                    const hm = document.getElementById('hitmarker');
+                    hm.style.opacity = '1';
+                    setTimeout(() => { hm.style.opacity = '0'; }, 90);
+
+                    if (bot.hp <= 0) {
+                        scene.remove(bot.group);
+                        const idx = bots.indexOf(bot);
+                        if (idx !== -1) bots.splice(idx, 1);
+                        for (let i = botHitboxes.length - 1; i >= 0; i--) {
+                            if (botHitboxes[i].userData.bot === bot) botHitboxes.splice(i, 1);
+                        }
+
+                        player.money = Math.min(16000, player.money + (isHead ? 500 : 350));
+                        scoreCT++;
+                        addKillFeed('ВЫ (CT)', 'ТЕРРОРИСТ', w.name + (isHead ? ' 🎯' : ''));
+                        updateScoreboardAvatars();
+                        updateHUD();
+
+                        if (bots.length === 0) {
+                            showRoundBanner('РАУНД ВЫИГРАН! СПЕЦНАЗ ПОБЕДИЛ (+$1000)');
+                            player.money = Math.min(16000, player.money + 1000);
+                            updateHUD();
+                            setTimeout(() => spawnDust2Bots(), 2400);
+                        }
+                    }
+                }
+            }
+
+            if (player.ammo === 0 && player.maxAmmo > 0 && w.type !== 'melee') {
+                setTimeout(triggerReload, 200);
+            }
+        }
+
+        window.switchWeaponSlot = function(slot) {
+            player.activeSlot = slot;
+            const weaponKey = player.inventory[slot];
+            player.weapon = weaponKey;
+            const w = weapons[weaponKey];
+            player.ammo = w.clip;
+            player.maxAmmo = w.maxClip;
+            player.reloading = false;
+            toggleScope(false);
+            buildWeaponModel(weaponKey);
+            playSound('reload');
+            updateHUD();
+
+            ['knife', 'pistol', 'primary'].forEach(s => {
+                const el = document.getElementById(`slot-${s}`);
+                if (el) {
+                    if (s === slot) {
+                        el.className = 'cs2-hud-card px-3 py-1 rounded-xl text-xs font-bold border-amber-400 text-amber-300 transition';
+                    } else {
+                        el.className = 'cs2-hud-card px-3 py-1 rounded-xl text-xs font-bold hover:border-amber-400 transition';
+                    }
+                }
+            });
+        };
+
+        // =========================================================================
+        // 8. MULTI-TOUCH CONTROLS (Floating Joystick + Independent Look & Aim)
+        // =========================================================================
+        let moveTouchId = null;
+        let moveOrigin = { x: 0, y: 0 };
+        let moveVec = { x: 0, y: 0 };
+
+        let lookTouchId = null;
+        let lookPrev = { x: 0, y: 0 };
+
+        const zoneMove = document.getElementById('zone-move');
+        const zoneLook = document.getElementById('zone-look');
+        const jsBase = document.getElementById('joystick-base');
+        const jsKnob = document.getElementById('joystick-knob');
+
+        // Floating thumbstick
+        zoneMove.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            ensureAudio();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (moveTouchId === null) {
+                    moveTouchId = t.identifier;
+                    moveOrigin.x = t.clientX;
+                    moveOrigin.y = t.clientY;
+                    moveVec.x = 0;
+                    moveVec.y = 0;
+
+                    jsBase.style.display = 'block';
+                    jsBase.style.left = `${t.clientX - 62}px`;
+                    jsBase.style.top = `${t.clientY - 62}px`;
+                    jsKnob.style.transform = `translate(0px, 0px)`;
+                }
+            }
+        }, { passive: false });
+
+        zoneMove.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === moveTouchId) {
+                    let dx = t.clientX - moveOrigin.x;
+                    let dy = t.clientY - moveOrigin.y;
+                    const maxR = 48;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > maxR) {
+                        dx = (dx / dist) * maxR;
+                        dy = (dy / dist) * maxR;
+                    }
+                    moveVec.x = dx / maxR;
+                    moveVec.y = dy / maxR;
+                    jsKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+                }
+            }
+        }, { passive: false });
+
+        function endMove(e) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === moveTouchId) {
+                    moveTouchId = null;
+                    moveVec.x = 0;
+                    moveVec.y = 0;
+                    jsBase.style.display = 'none';
+                }
+            }
+        }
+        zoneMove.addEventListener('touchend', endMove);
+        zoneMove.addEventListener('touchcancel', endMove);
+
+        // Right side camera swipe look
+        zoneLook.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            ensureAudio();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (lookTouchId === null) {
+                    lookTouchId = t.identifier;
+                    lookPrev.x = t.clientX;
+                    lookPrev.y = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        zoneLook.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === lookTouchId) {
+                    const dx = t.clientX - lookPrev.x;
+                    const dy = t.clientY - lookPrev.y;
+                    const mult = player.scoped ? 0.42 : 1.0;
+                    player.yaw -= dx * lookSensitivity * mult;
+                    player.pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, player.pitch - dy * lookSensitivity * 0.85 * mult));
+                    lookPrev.x = t.clientX;
+                    lookPrev.y = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        function endLook(e) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === lookTouchId) {
+                    lookTouchId = null;
+                }
+            }
+        }
+        zoneLook.addEventListener('touchend', endLook);
+        zoneLook.addEventListener('touchcancel', endLook);
+
+        // Fire Buttons with drag-aim capability
+        let fireTouchId = null;
+        let firePrev = { x: 0, y: 0 };
+        const btnFire = document.getElementById('btn-fire');
+        const btnFireLeft = document.getElementById('btn-fire-left');
+
+        btnFire.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            ensureAudio();
+            isFiringHold = true;
+            fireWeapon();
+            const t = e.changedTouches[0];
+            fireTouchId = t.identifier;
+            firePrev.x = t.clientX;
+            firePrev.y = t.clientY;
+        }, { passive: false });
+
+        btnFire.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === fireTouchId) {
+                    const dx = t.clientX - firePrev.x;
+                    const dy = t.clientY - firePrev.y;
+                    const mult = player.scoped ? 0.42 : 1.0;
+                    player.yaw -= dx * lookSensitivity * mult;
+                    player.pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, player.pitch - dy * lookSensitivity * 0.85 * mult));
+                    firePrev.x = t.clientX;
+                    firePrev.y = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        btnFire.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isFiringHold = false;
+            fireTouchId = null;
+        });
+
+        btnFireLeft.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isFiringHold = true;
+            fireWeapon();
+        }, { passive: false });
+        btnFireLeft.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isFiringHold = false;
+        });
+
+        // Quick Weapon Cycle for mobile
+        const slotsOrder = ['knife', 'pistol', 'primary'];
+        document.getElementById('btn-swap-mobile').addEventListener('click', () => {
+            let nextIdx = (slotsOrder.indexOf(player.activeSlot) + 1) % slotsOrder.length;
+            switchWeaponSlot(slotsOrder[nextIdx]);
+        });
+
+        document.getElementById('btn-reload').addEventListener('click', triggerReload);
+        document.getElementById('btn-scope').addEventListener('click', () => toggleScope());
+        document.getElementById('btn-jump').addEventListener('click', () => {
+            if (player.onGround) {
+                player.vy = 0.165;
+                player.onGround = false;
+            }
+        });
+
+        document.getElementById('btn-autofire').addEventListener('click', () => {
+            autoFireEnabled = !autoFireEnabled;
+            document.getElementById('autofire-state').innerText = autoFireEnabled ? 'ВКЛ' : 'ВЫКЛ';
+            document.getElementById('autofire-state').className = autoFireEnabled ? 'text-emerald-400' : 'text-slate-400';
+            document.getElementById('autofire-dot').className = autoFireEnabled ? 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]' : 'w-2 h-2 rounded-full bg-slate-500';
+        });
+
+        document.getElementById('btn-dismiss-portrait').addEventListener('click', () => {
+            document.getElementById('portrait-warning').classList.add('dismissed');
+        });
+
+        // Buy Menu & Sensitivity
+        const buyMenu = document.getElementById('buy-menu');
+        document.getElementById('btn-buy').addEventListener('click', () => buyMenu.classList.remove('hidden'));
+        document.getElementById('close-buy').addEventListener('click', () => buyMenu.classList.add('hidden'));
+
+        document.getElementById('sens-slider').addEventListener('input', (e) => {
+            lookSensitivity = parseFloat(e.target.value) * 0.00085;
+        });
+
+        window.buyWeapon = function(key, cost) {
+            if (player.money >= cost) {
+                player.money -= cost;
+                const slot = weapons[key].type === 'pistol' ? 'pistol' : 'primary';
+                player.inventory[slot] = key;
+                switchWeaponSlot(slot);
+                buyMenu.classList.add('hidden');
+            }
+        };
+
+        window.buyArmor = function(cost) {
+            if (player.money >= cost) {
+                player.money -= cost;
+                player.armor = 100;
+                player.hp = 100;
+                playSound('reload');
+                updateHUD();
+                buyMenu.classList.add('hidden');
+            }
+        };
+
+        // Desktop keyboard/mouse controls fallback
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyR') triggerReload();
+            if (e.code === 'KeyB') buyMenu.classList.toggle('hidden');
+            if (e.code === 'Digit1') switchWeaponSlot('primary');
+            if (e.code === 'Digit2') switchWeaponSlot('pistol');
+            if (e.code === 'Digit3') switchWeaponSlot('knife');
+            if (e.code === 'Space' && player.onGround) {
+                player.vy = 0.165;
+                player.onGround = false;
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        let isMouseDown = false;
+        zoneLook.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            lookPrev.x = e.clientX;
+            lookPrev.y = e.clientY;
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const dx = e.clientX - lookPrev.x;
+            const dy = e.clientY - lookPrev.y;
+            player.yaw -= dx * lookSensitivity;
+            player.pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, player.pitch - dy * lookSensitivity * 0.85));
+            lookPrev.x = e.clientX;
+            lookPrev.y = e.clientY;
+        });
+        window.addEventListener('mouseup', () => { isMouseDown = false; isFiringHold = false; });
+        btnFire.addEventListener('mousedown', () => { isFiringHold = true; fireWeapon(); });
+
+        // =========================================================================
+        // 9. CS2 HUD, KILLFEED & RADAR RENDERING
+        // =========================================================================
+        // Crosshair & Graphics Settings State
+        const crosshairConfig = {
+            preset: 'classic',
+            color: '#22c55e',
+            size: 9,
+            gap: 4,
+            thickness: 2,
+            hasDot: true
+        };
+
+        function renderCrosshairUI(prefix = '') {
+            const top = document.getElementById(`${prefix}ch-top`);
+            const bot = document.getElementById(`${prefix}ch-bottom`);
+            const left = document.getElementById(`${prefix}ch-left`);
+            const right = document.getElementById(`${prefix}ch-right`);
+            const dot = document.getElementById(`${prefix}ch-dot`);
+            const circle = document.getElementById(`${prefix}ch-circle`);
+
+            const col = crosshairConfig.color;
+            const sz = crosshairConfig.size;
+            const gp = crosshairConfig.gap;
+            const th = crosshairConfig.thickness;
+
+            // Reset visibility
+            top.style.display = 'block';
+            bot.style.display = 'block';
+            left.style.display = 'block';
+            right.style.display = 'block';
+            circle.style.display = 'none';
+
+            if (crosshairConfig.preset === 'dot') {
+                top.style.display = 'none';
+                bot.style.display = 'none';
+                left.style.display = 'none';
+                right.style.display = 'none';
+            } else if (crosshairConfig.preset === 'circle') {
+                circle.style.display = 'block';
+                circle.style.borderColor = col;
+                circle.style.width = `${sz * 2 + gp}px`;
+                circle.style.height = `${sz * 2 + gp}px`;
+                circle.style.borderWidth = `${th}px`;
+                top.style.display = 'none';
+                bot.style.display = 'none';
+                left.style.display = 'none';
+                right.style.display = 'none';
+            } else if (crosshairConfig.preset === 'box') {
+                circle.style.display = 'block';
+                circle.style.borderRadius = '3px';
+                circle.style.borderColor = col;
+                circle.style.width = `${sz * 1.6 + gp}px`;
+                circle.style.height = `${sz * 1.6 + gp}px`;
+                circle.style.borderWidth = `${th}px`;
+                top.style.display = 'none';
+                bot.style.display = 'none';
+                left.style.display = 'none';
+                right.style.display = 'none';
+            } else {
+                circle.style.borderRadius = '9999px';
+            }
+
+            // Cross lines geometry
+            [top, bot].forEach(el => {
+                el.style.backgroundColor = col;
+                el.style.width = `${th}px`;
+                el.style.height = `${sz}px`;
+            });
+            top.style.top = `-${sz + gp}px`;
+            bot.style.bottom = `-${sz + gp}px`;
+
+            [left, right].forEach(el => {
+                el.style.backgroundColor = col;
+                el.style.height = `${th}px`;
+                el.style.width = `${sz}px`;
+            });
+            left.style.left = `-${sz + gp}px`;
+            right.style.right = `-${sz + gp}px`;
+
+            // Center dot
+            if (crosshairConfig.hasDot || crosshairConfig.preset === 'dot') {
+                dot.style.display = 'block';
+                dot.style.backgroundColor = col;
+                const dotSize = Math.max(3, th + 1);
+                dot.style.width = `${dotSize}px`;
+                dot.style.height = `${dotSize}px`;
+            } else {
+                dot.style.display = 'none';
+            }
+        }
+
+        function updateAllCrosshairs() {
+            renderCrosshairUI('');
+            renderCrosshairUI('preview-');
+        }
+
+        window.setCrosshairColor = function(hex) {
+            crosshairConfig.color = hex;
+            updateAllCrosshairs();
+        };
+
+        window.applyCrosshairPreset = function(p) {
+            crosshairConfig.preset = p;
+            if (p === 'classic') {
+                crosshairConfig.size = 9;
+                crosshairConfig.gap = 4;
+                crosshairConfig.thickness = 2;
+                crosshairConfig.hasDot = true;
+            } else if (p === 'dot') {
+                crosshairConfig.hasDot = true;
+                crosshairConfig.thickness = 3;
+            } else if (p === 'circle') {
+                crosshairConfig.size = 11;
+                crosshairConfig.gap = 5;
+                crosshairConfig.thickness = 2;
+                crosshairConfig.hasDot = true;
+            } else if (p === 'box') {
+                crosshairConfig.size = 10;
+                crosshairConfig.gap = 3;
+                crosshairConfig.thickness = 2;
+                crosshairConfig.hasDot = false;
+            }
+            document.getElementById('slider-ch-size').value = crosshairConfig.size;
+            document.getElementById('slider-ch-gap').value = crosshairConfig.gap;
+            document.getElementById('slider-ch-thick').value = crosshairConfig.thickness;
+            document.getElementById('toggle-ch-dot').checked = crosshairConfig.hasDot;
+            updateAllCrosshairs();
+        };
+
+        // Graphics Preset Application
+        window.setGraphicsPreset = function(level) {
+            ['low', 'med', 'high', 'ultra'].forEach(lvl => {
+                const btn = document.getElementById(`preset-${lvl}`);
+                if (lvl === level) {
+                    btn.className = 'px-2 py-2 bg-slate-900 border border-amber-400 text-amber-300 rounded-xl text-xs font-bold transition';
+                } else {
+                    btn.className = 'px-2 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold hover:border-amber-400 transition';
+                }
+            });
+
+            if (level === 'low') {
+                renderer.setPixelRatio(0.85);
+                renderer.shadowMap.enabled = false;
+                document.getElementById('toggle-shadows').checked = false;
+                document.getElementById('select-render-scale').value = '0.85';
+                scene.fog.density = 0;
+            } else if (level === 'med') {
+                renderer.setPixelRatio(1.0);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.BasicShadowMap;
+                document.getElementById('toggle-shadows').checked = true;
+                document.getElementById('select-render-scale').value = '1.0';
+                scene.fog.density = 0.007;
+            } else if (level === 'high') {
+                renderer.setPixelRatio(1.5);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('toggle-shadows').checked = true;
+                document.getElementById('select-render-scale').value = '1.5';
+                scene.fog.density = 0.009;
+            } else if (level === 'ultra') {
+                renderer.setPixelRatio(2.0);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('toggle-shadows').checked = true;
+                document.getElementById('select-render-scale').value = '2.0';
+                scene.fog.density = 0.01;
+            }
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        // Initialize Settings Modal UI events
+        const settingsModal = document.getElementById('settings-modal');
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            updateAllCrosshairs();
+        });
+        document.getElementById('close-settings').addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        const tabBtnGfx = document.getElementById('tab-btn-graphics');
+        const tabBtnCh = document.getElementById('tab-btn-crosshair');
+        const tabContGfx = document.getElementById('tab-content-graphics');
+        const tabContCh = document.getElementById('tab-content-crosshair');
+
+        tabBtnGfx.addEventListener('click', () => {
+            tabBtnGfx.className = 'setting-tab active px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 transition';
+            tabBtnCh.className = 'setting-tab px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 text-slate-400 transition';
+            tabContGfx.classList.remove('hidden');
+            tabContCh.classList.add('hidden');
+        });
+
+        tabBtnCh.addEventListener('click', () => {
+            tabBtnCh.className = 'setting-tab active px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 transition';
+            tabBtnGfx.className = 'setting-tab px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/10 text-slate-400 transition';
+            tabContCh.classList.remove('hidden');
+            tabContGfx.classList.add('hidden');
+            updateAllCrosshairs();
+        });
+
+        document.getElementById('toggle-shadows').addEventListener('change', (e) => {
+            renderer.shadowMap.enabled = e.target.checked;
+        });
+
+        document.getElementById('select-render-scale').addEventListener('change', (e) => {
+            renderer.setPixelRatio(parseFloat(e.target.value));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.getElementById('slider-fov').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            document.getElementById('fov-display').innerText = `${val}°`;
+            if (!player.scoped) {
+                camera.fov = val;
+                camera.updateProjectionMatrix();
+            }
+        });
+
+        document.getElementById('slider-ch-size').addEventListener('input', (e) => {
+            crosshairConfig.size = parseInt(e.target.value);
+            updateAllCrosshairs();
+        });
+        document.getElementById('slider-ch-gap').addEventListener('input', (e) => {
+            crosshairConfig.gap = parseInt(e.target.value);
+            updateAllCrosshairs();
+        });
+        document.getElementById('slider-ch-thick').addEventListener('input', (e) => {
+            crosshairConfig.thickness = parseInt(e.target.value);
+            updateAllCrosshairs();
+        });
+        document.getElementById('toggle-ch-dot').addEventListener('change', (e) => {
+            crosshairConfig.hasDot = e.target.checked;
+            updateAllCrosshairs();
+        });
+
+        updateAllCrosshairs();
+
+        function updateScoreboardAvatars() {
+            for (let i = 0; i < 5; i++) {
+                const av = document.getElementById(`t-av-${i}`);
+                if (av) {
+                    av.className = i < bots.length ? 'w-2.5 h-4 bg-amber-500 rounded-sm shadow-[0_0_4px_#f59e0b]' : 'w-2.5 h-4 bg-slate-700/80 rounded-sm';
+                }
+            }
+        }
+
+        function addKillFeed(killer, victim, weaponName) {
+            const feed = document.getElementById('kill-feed');
+            const item = document.createElement('div');
+            item.className = 'cs2-glass px-3 py-1 rounded-xl text-xs flex items-center space-x-1.5 border-r-4 border-amber-400 shadow-lg';
+            item.innerHTML = `<span class="text-sky-400 font-bold">${killer}</span> <span class="text-amber-300 font-semibold">[${weaponName}]</span> <span class="text-red-400 font-bold">${victim}</span>`;
+            feed.appendChild(item);
+            setTimeout(() => item.remove(), 3800);
+        }
+
+        function updateHUD() {
+            document.getElementById('player-hp').innerText = Math.max(0, Math.round(player.hp));
+            document.getElementById('hp-bar').style.width = `${Math.max(0, Math.min(100, player.hp))}%`;
+            document.getElementById('player-armor').innerText = Math.max(0, Math.round(player.armor));
+            document.getElementById('armor-bar').style.width = `${Math.max(0, Math.min(100, player.armor))}%`;
+
+            document.getElementById('player-money').innerText = player.money;
+            document.getElementById('player-money-top').innerText = player.money;
+            document.getElementById('buy-money-display').innerText = player.money;
+            document.getElementById('weapon-name').innerText = weapons[player.weapon].name;
+            document.getElementById('ammo-cur').innerText = player.ammo;
+            document.getElementById('ammo-max').innerText = player.maxAmmo;
+            document.getElementById('score-t').innerText = scoreT;
+            document.getElementById('score-ct').innerText = scoreCT;
+            document.getElementById('player-loc-name').innerText = getPlayerLocationName();
+        }
+
+        const radarCanvas = document.getElementById('radarCanvas');
+        const rCtx = radarCanvas.getContext('2d');
+
+        function drawRadar() {
+            rCtx.clearRect(0, 0, 128, 128);
+            const scale = 128 / 96; // 96x96 map area
+
+            // Draw Map colliders (limestone walls, doors, crates)
+            mapColliders.forEach(c => {
+                rCtx.fillStyle = c.isCrate ? '#d97706' : (c.tag ? '#38bdf8' : '#475569');
+                const rx = (c.minX + 48) * scale;
+                const rz = (c.minZ + 48) * scale;
+                const rw = (c.maxX - c.minX) * scale;
+                const rd = (c.maxZ - c.minZ) * scale;
+                rCtx.fillRect(rx, rz, rw, rd);
+            });
+
+            // Bombsite [A] and [B] markers
+            rCtx.fillStyle = '#f59e0b';
+            rCtx.font = 'bold 9px Teko, sans-serif';
+            rCtx.fillText('A', (28 + 48) * scale - 3, (-28 + 48) * scale + 4);
+            rCtx.fillStyle = '#38bdf8';
+            rCtx.fillText('B', (-32 + 48) * scale - 3, (-32 + 48) * scale + 4);
+
+            // Player dot with viewing cone
+            const px = (player.x + 48) * scale;
+            const pz = (player.z + 48) * scale;
+
+            rCtx.save();
+            rCtx.translate(px, pz);
+            rCtx.rotate(-player.yaw);
+
+            rCtx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+            rCtx.beginPath();
+            rCtx.moveTo(0, 0);
+            rCtx.lineTo(-14, -26);
+            rCtx.lineTo(14, -26);
+            rCtx.closePath();
+            rCtx.fill();
+
+            rCtx.fillStyle = '#38bdf8';
+            rCtx.beginPath();
+            rCtx.arc(0, 0, 3.5, 0, Math.PI * 2);
+            rCtx.fill();
+            rCtx.restore();
+
+            // Terrorist Bot Red Blips
+            rCtx.fillStyle = '#ef4444';
+            bots.forEach(b => {
+                const bx = (b.group.position.x + 48) * scale;
+                const bz = (b.group.position.z + 48) * scale;
+                rCtx.beginPath();
+                rCtx.arc(bx, bz, 3.2, 0, Math.PI * 2);
+                rCtx.fill();
+            });
+        }
+
+        // Round Timer
+        setInterval(() => {
+            roundSeconds = Math.max(0, roundSeconds - 1);
+            const m = Math.floor(roundSeconds / 60);
+            const s = String(roundSeconds % 60).padStart(2, '0');
+            document.getElementById('round-timer').innerText = `${m}:${s}`;
+            if (roundSeconds === 0) roundSeconds = 115;
+        }, 1000);
+
+        // =========================================================================
+        // 10. MAIN ENGINE GAME LOOP
+        // =========================================================================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let lastTime = performance.now();
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min(50, now - lastTime);
+            lastTime = now;
+
+            // Combine Touch Joystick + Keyboard inputs
+            let fwd = -moveVec.y;
+            let strafe = moveVec.x;
+            if (keys['KeyW'] || keys['ArrowUp']) fwd += 1;
+            if (keys['KeyS'] || keys['ArrowDown']) fwd -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) strafe += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) strafe -= 1;
+
+            const speed = 0.0088 * dt;
+            const sinY = Math.sin(player.yaw);
+            const cosY = Math.cos(player.yaw);
+
+            const dx = (-sinY * fwd + cosY * strafe) * speed;
+            const dz = (-cosY * fwd - sinY * strafe) * speed;
+
+            if (canMoveTo(player.x + dx, player.z, player.y)) player.x += dx;
+            if (canMoveTo(player.x, player.z + dz, player.y)) player.z += dz;
+
+            // Gravity & Stepping
+            const groundY = getGroundHeight(player.x, player.z) + 1.7;
+            player.y += player.vy;
+            if (player.y > groundY) {
+                player.vy -= 0.00064 * dt;
+                player.onGround = false;
+            } else {
+                player.y = groundY;
+                player.vy = 0;
+                player.onGround = true;
+            }
+
+            camera.position.set(player.x, player.y, player.z);
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = player.yaw;
+            camera.rotation.x = player.pitch;
+
+            // Viewmodel Bob & Recoil
+            const isMoving = Math.hypot(fwd, strafe) > 0.1;
+            if (isMoving && player.onGround) {
+                player.walkBob += dt * 0.012;
+            } else {
+                player.walkBob *= 0.88;
+            }
+
+            player.recoilOffset *= 0.82;
+            if (flashMat.opacity > 0) flashMat.opacity = Math.max(0, flashMat.opacity - 0.2);
+
+            if (player.reloading) {
+                player.reloadProgress += dt / 1150;
+                weaponGroup.rotation.x = -Math.sin(player.reloadProgress * Math.PI) * 0.9;
+                if (player.reloadProgress >= 1) {
+                    player.reloading = false;
+                    weaponGroup.rotation.x = 0;
+                    const w = weapons[player.weapon];
+                    const needed = w.clip - player.ammo;
+                    const take = Math.min(needed, player.maxAmmo);
+                    player.ammo += take;
+                    player.maxAmmo -= take;
+                    updateHUD();
+                }
+            } else {
+                weaponGroup.position.x = Math.cos(player.walkBob) * 0.015;
+                weaponGroup.position.y = Math.abs(Math.sin(player.walkBob)) * 0.015 - player.recoilOffset * 0.25;
+                weaponGroup.position.z = player.recoilOffset * 0.9;
+                weaponGroup.rotation.x = player.recoilOffset * 1.1;
+            }
+
+            // Continuous Auto-Fire or Hold Fire
+            if (isFiringHold && weapons[player.weapon].auto) {
+                fireWeapon();
+            } else if (autoFireEnabled && !player.reloading && weapons[player.weapon].type !== 'melee') {
+                raycaster.setFromCamera(screenCenter, camera);
+                const wallHits = raycaster.intersectObjects(wallMeshes, false);
+                const closestWallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+                const botHits = raycaster.intersectObjects(botHitboxes, false);
+                if (botHits.length > 0 && botHits[0].distance < closestWallDist) {
+                    fireWeapon();
+                }
+            }
+
+            // AI Bots Combat Logic & Animation
+            bots.forEach(bot => {
+                const bx = bot.group.position.x;
+                const bz = bot.group.position.z;
+                const toPlayerX = player.x - bx;
+                const toPlayerZ = player.z - bz;
+                const dist = Math.hypot(toPlayerX, toPlayerZ);
+
+                bot.group.rotation.y = Math.atan2(toPlayerX, toPlayerZ);
+                bot.hpBg.lookAt(camera.position);
+                bot.hpFill.lookAt(camera.position);
+
+                const botSpeed = 0.0039 * dt;
+                let moveX = 0;
+                let moveZ = 0;
+                if (dist > 8.5) {
+                    moveX = (toPlayerX / dist) * botSpeed;
+                    moveZ = (toPlayerZ / dist) * botSpeed;
+                } else {
+                    moveX = (toPlayerZ / dist) * bot.strafeDir * botSpeed * 0.75;
+                    moveZ = (-toPlayerX / dist) * bot.strafeDir * botSpeed * 0.75;
+                    if (Math.random() < 0.015) bot.strafeDir *= -1;
+                }
+
+                if (canMoveTo(bx + moveX, bz, 1.7)) bot.group.position.x += moveX;
+                if (canMoveTo(bx, bz + moveZ, 1.7)) bot.group.position.z += moveZ;
+
+                bot.walkCycle += dt * 0.01;
+                bot.leftLeg.rotation.x = Math.sin(bot.walkCycle) * 0.55;
+                bot.rightLeg.rotation.x = -Math.sin(bot.walkCycle) * 0.55;
+
+                bot.shootTimer += dt;
+                if (bot.shootTimer > 1300 && dist < 28) {
+                    bot.shootTimer = 0;
+                    const botEye = new THREE.Vector3(bx, 1.6, bz);
+                    const dirToPlayer = new THREE.Vector3(player.x - bx, (player.y - 0.3) - 1.6, player.z - bz).normalize();
+                    raycaster.set(botEye, dirToPlayer);
+                    const wHits = raycaster.intersectObjects(wallMeshes, false);
+
+                    if (wHits.length === 0 || wHits[0].distance > dist) {
+                        const dmg = 12;
+                        if (player.armor > 0) {
+                            player.armor = Math.max(0, player.armor - dmg * 0.5);
+                            player.hp -= dmg * 0.55;
+                        } else {
+                            player.hp -= dmg;
+                        }
+                        const dmgOverlay = document.getElementById('damage-overlay');
+                        dmgOverlay.style.opacity = '1';
+                        setTimeout(() => { dmgOverlay.style.opacity = '0'; }, 180);
+
+                        if (player.hp <= 0) {
+                            scoreT++;
+                            addKillFeed('ТЕРРОРИСТ', 'ВЫ (CT)', 'AK-47');
+                            showRoundBanner('РАУНД ПРОИГРАН! ТЕРРОРИСТЫ ПОБЕДИЛИ');
+                            player.hp = 100;
+                            player.armor = 100;
+                            player.x = 28;
+                            player.z = -20;
+                            player.yaw = Math.PI;
+                            player.pitch = 0;
+                            player.ammo = weapons[player.weapon].clip;
+                        }
+                        updateHUD();
+                    }
+                }
+            });
+
+            drawRadar();
+            renderer.render(scene, camera);
+        }
+
+        updateHUD();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
